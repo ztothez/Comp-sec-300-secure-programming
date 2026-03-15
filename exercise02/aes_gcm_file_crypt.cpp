@@ -8,6 +8,21 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 
+static FILE* safe_fopen(const std::string& path, const char* mode) {
+    const char* safe_path = path.c_str();
+
+    const char* slash = std::strrchr(safe_path, '/');
+    if (slash != nullptr) {
+        safe_path = slash + 1;
+    }
+
+    if (std::strstr(safe_path, "..") != nullptr || std::strchr(safe_path, '\\') != nullptr) {
+        return nullptr;
+    }
+
+    return std::fopen(safe_path, mode);
+}
+
 static const uint8_t MAGIC[8] = {'C','R','Y','P','T','0','1','\0'};
 
 static const int SALT_LEN = 16;
@@ -31,7 +46,7 @@ struct Ctx {
 };
 
 static std::vector<uint8_t> read_all(const std::string& path) {
-    FILE* f = std::fopen(path.c_str(), "rb");
+    FILE* f = safe_fopen(path, "rb");
     if (!f) die("Cannot open input file");
 
     if (std::fseek(f, 0, SEEK_END) != 0) {
@@ -64,7 +79,7 @@ static std::vector<uint8_t> read_all(const std::string& path) {
 }
 
 static void write_all(const std::string& path, const std::vector<uint8_t>& data) {
-    FILE* f = std::fopen(path.c_str(), "wb");
+    FILE* f = safe_fopen(path, "wb");
     if (!f) die("Cannot open output file");
 
     size_t off = 0;
