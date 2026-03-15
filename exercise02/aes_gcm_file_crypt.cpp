@@ -84,6 +84,9 @@ static void write_all(const std::string& path, const std::vector<uint8_t>& data)
 
     size_t off = 0;
     while (off < data.size()) {
+        if (off > data.size())
+            die("write offset overflow");
+        
         size_t n = std::fwrite(data.data() + off, 1, data.size() - off, f);
         if (n == 0) {
             std::fclose(f);
@@ -137,6 +140,9 @@ static std::vector<uint8_t> encrypt_aes_gcm(
             die("EncryptUpdate failed");
     }
 
+    if ((size_t)outlen >= ciphertext.size())
+        die("output length overflow");
+    
     if (EVP_EncryptFinal_ex(ctx.p, ciphertext.data() + outlen, &tmplen) != 1)
         die("EncryptFinal failed");
 
@@ -179,6 +185,9 @@ static std::vector<uint8_t> decrypt_aes_gcm(
     // Set expected tag before finalizing (GCM verification happens in Final)
     if (EVP_CIPHER_CTX_ctrl(ctx.p, EVP_CTRL_GCM_SET_TAG, TAG_LEN, (void*)tag) != 1)
         die("Set TAG failed");
+
+    if ((size_t)outlen >= plaintext.size())
+    die("output length overflow");
 
     int fin = EVP_DecryptFinal_ex(ctx.p, plaintext.data() + outlen, &tmplen);
     if (fin != 1) {
@@ -247,7 +256,13 @@ int main(int argc, char** argv) {
             const size_t tag_off = in.size() - TAG_LEN;
             if (tag_off < ct_off) die("Bad file layout");
 
+            if (ct_off > in.size() || tag_off > in.size() || ct_off > tag_off)
+                die("invalid ciphertext bounds");
+            
             std::vector<uint8_t> ct(in.begin() + (ptrdiff_t)ct_off, in.begin() + (ptrdiff_t)tag_off);
+            if (tag_off > in.size())
+                die("tag offset overflow");
+            
             const uint8_t* tag = in.data() + tag_off;
 
             uint8_t key[KEY_LEN];
