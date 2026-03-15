@@ -1,4 +1,11 @@
 import sys
+import os
+
+def safe_path(path):
+    name = os.path.basename(path)
+    if name != path or not name or name in (".", ".."):
+        raise ValueError("invalid path")
+    return name
 
 # Only allow alphanumeric characters plus comma and dash
 ALLOWED = set(b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,-")
@@ -13,7 +20,10 @@ def main():
 
     # Read file in binary mode to avoid implicit decoding issues
     try:
-        with open(path, "rb") as f:
+        # Earlier vulnerable part: with open(path, "rb") as f:
+        # VULNERABLE: user-controlled path could allow path traversal
+        # Fixed due to Snyk analysis
+        with open(safe_path(path), "rb") as f:
             data = f.read()
     except OSError as e:
         print(f"Error reading file: {e}", file=sys.stderr)
